@@ -1,6 +1,8 @@
 package httpserver;
 
 import java.io.*;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.StringTokenizer;
 
@@ -19,15 +21,14 @@ public class HttpRequestHandler implements Runnable {
         this.socket = socket;
         this.input = socket.getInputStream();
         this.output = socket.getOutputStream();
-        this.br = new BufferedReader(new InputStreamReader(socket
-                .getInputStream()));
+        this.br = new BufferedReader(new InputStreamReader(input));
     }
 
     public void run() {
         try {
             processRequest();
         } catch (Exception e) {
-            System.out.println(e);
+            System.out.println(e.getMessage());
         }
     }
 
@@ -55,10 +56,10 @@ public class HttpRequestHandler implements Runnable {
                     fileExists = false;
                 }
                 String serverLine = "Server: Simple Java Http Server";
-                String statusLine = null;
-                String contentTypeLine = null;
+                String statusLine;
+                String contentTypeLine;
                 String entityBody = null;
-                String contentLengthLine = "error";
+                String contentLengthLine;
                 if (fileExists) {
                     statusLine = "HTTP/1.0 200 OK" + CRLF;
                     contentTypeLine = "Content-type: " + contentType(fileName)
@@ -67,12 +68,13 @@ public class HttpRequestHandler implements Runnable {
                             + (new Integer(fis.available())).toString() + CRLF;
                 } else {
                     statusLine = "HTTP/1.0 404 Not Found" + CRLF;
-                    contentTypeLine = "text/html";
+                    contentTypeLine = "Content-type: text/html" + CRLF;
                     entityBody = "<HTML>"
                             + "<HEAD><TITLE>404 Not Found</TITLE></HEAD>"
                             + "<BODY>404 Not Found"
-                            + "<br>usage:http://yourHostName:port/"
-                            + "fileName.html</BODY></HTML>";
+                            + "<br>usage:http://" + socket.getLocalAddress() + ":" + socket.getLocalPort()
+                            + fileName.substring(1) +"</BODY></HTML>";
+                    contentLengthLine = "Content-Length: " + (new Integer(entityBody.getBytes().length)).toString() + CRLF;
                 }
 
                 // Send the status line.
@@ -113,6 +115,8 @@ public class HttpRequestHandler implements Runnable {
         } catch (Exception e) {
         }
     }
+
+    //private
 
     private static void sendBytes(FileInputStream fis, OutputStream os)
             throws Exception {

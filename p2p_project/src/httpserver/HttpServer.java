@@ -6,6 +6,10 @@ import java.net.Socket;
 
 public class HttpServer {
     public static void main(String args[]) {
+        new HttpServer().startHttpServer(args);
+    }
+
+    private void startHttpServer(String[] args) {
         int port;
         ServerSocket server_socket;
         try {
@@ -16,7 +20,7 @@ public class HttpServer {
         try {
 
             server_socket = new ServerSocket(port);
-            System.out.println("httpServer running on port "
+            System.out.println("HttpServer running on port "
                     + server_socket.getLocalPort());
 
             // server infinite loop
