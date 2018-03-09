@@ -45,13 +45,15 @@ public class HttpRequestHandler implements Runnable {
 
             if (temp.equals("GET")) {
 
-                String fileName = s.nextToken();
-                fileName = "." + fileName;
+                String dirPath = s.nextToken().split("\\s")[0];
+                String[] pathParts = dirPath.split("/");
+
+
 
                 FileInputStream fis = null;
                 boolean fileExists = true;
                 try {
-                    fis = new FileInputStream(fileName);
+                    fis = new FileInputStream("." + fileName);
                 } catch (FileNotFoundException e) {
                     fileExists = false;
                 }
@@ -73,7 +75,7 @@ public class HttpRequestHandler implements Runnable {
                             + "<HEAD><TITLE>404 Not Found</TITLE></HEAD>"
                             + "<BODY>404 Not Found"
                             + "<br>usage:http://" + socket.getLocalAddress() + ":" + socket.getLocalPort()
-                            + fileName.substring(1) +"</BODY></HTML>";
+                            + fileName +"</BODY></HTML>";
                     contentLengthLine = "Content-Length: " + (new Integer(entityBody.getBytes().length)).toString() + CRLF;
                 }
 
@@ -106,6 +108,7 @@ public class HttpRequestHandler implements Runnable {
                 }
 
             }
+
         }
 
         try {
