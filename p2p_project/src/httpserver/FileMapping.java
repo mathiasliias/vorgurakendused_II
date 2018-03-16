@@ -1,15 +1,28 @@
 package httpserver;
 
-import jdk.nashorn.internal.objects.annotations.Getter;
-
+import javax.json.JsonObject;
+import javax.websocket.server.PathParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.Produces;
+
+import com.sun.faces.util.Json;
+
 import javax.ws.rs.Path;
 
-@Path("/files")
+@Path("files")
 public class FileMapping {
 
     @GET
+    @Path("all")
     @Produces("application/json")
-    public
+    public JsonObject getAllFilesData() {
+    	
+    }
+    
+    @GET
+    @Path("/{id}")
+    public JsonObject getFileData(@PathParam("id") String id) {
+    	
+    }
+    
 }
