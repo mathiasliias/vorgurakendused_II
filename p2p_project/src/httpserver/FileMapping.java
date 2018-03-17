@@ -16,13 +16,13 @@ public class FileMapping {
     @Path("all")
     @Produces("application/json")
     public JsonObject getAllFilesData() {
-    	
+    	return null;
     }
     
     @GET
     @Path("/{id}")
     public JsonObject getFileData(@PathParam("id") String id) {
-    	
+    	return null;
     }
     
 }

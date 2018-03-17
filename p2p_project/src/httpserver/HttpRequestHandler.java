@@ -5,17 +5,25 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.StringTokenizer;
+import java.util.regex.Pattern;
+
 
 public class HttpRequestHandler implements Runnable {
     final static String CRLF = "\r\n";
 
-    Socket socket;
+    private Socket socket;
 
-    InputStream input;
+    private InputStream input;
 
-    OutputStream output;
+    private OutputStream output;
 
-    BufferedReader br;
+    private BufferedReader br;
+    
+    private String statusOkLine = "HTTP/1.0 200 OK" + CRLF;;
+    private String contentTypeJSONLine = "Content-Type: application/json" + CRLF;
+    private String entityBody = null;
+    private String contentLengthLine;
+        
 
     public HttpRequestHandler(Socket socket) throws Exception {
         this.socket = socket;
@@ -40,15 +48,26 @@ public class HttpRequestHandler implements Runnable {
             if (headerLine.equals(CRLF) || headerLine.equals(""))
                 break;
 
-            StringTokenizer s = new StringTokenizer(headerLine);
-            String temp = s.nextToken();
+            // GET[/clones, /blocks, /blocks/x, /block/x,] POST[/block /transaction]
+            String[] headerLines = headerLine.split("\\s");
+            
 
-            if (temp.equals("GET")) {
+            if (headerLines[0].equals("GET")) {
+            	
+            	if (headerLines[1].equals("/clones")) {
+            		sendOkResponse();
+            	} else if (headerLines[1].equals("/blocks")) {
+            		sendOkResponse();
+				} else if (Pattern.matches("/blocks/.*", headerLines[1])) {
+					String blocksFrom = headerLines[1].split("/")[1];
+					sendOkResponse();
+				} else if (Pattern.matches("/block/.*", headerLines[1])) {
+					String blockId = headerLines[1].split("/")[1];
+					sendOkResponse();
+				}
+            	
 
-                String dirPath = s.nextToken().split("\\s")[0];
-                String[] pathParts = dirPath.split("/");
-
-
+                String fileName = "/results.txt";
 
                 FileInputStream fis = null;
                 boolean fileExists = true;
@@ -57,47 +76,18 @@ public class HttpRequestHandler implements Runnable {
                 } catch (FileNotFoundException e) {
                     fileExists = false;
                 }
-                String serverLine = "Server: Simple Java Http Server";
-                String statusLine;
-                String contentTypeLine;
-                String entityBody = null;
-                String contentLengthLine;
+
                 if (fileExists) {
-                    statusLine = "HTTP/1.0 200 OK" + CRLF;
-                    contentTypeLine = "Content-type: " + contentType(fileName)
-                            + CRLF;
-                    contentLengthLine = "Content-Length: "
-                            + (new Integer(fis.available())).toString() + CRLF;
+
                 } else {
-                    statusLine = "HTTP/1.0 404 Not Found" + CRLF;
-                    contentTypeLine = "Content-type: text/html" + CRLF;
+                    String statusBadLine = "HTTP/1.0 404 Not Found" + CRLF;
                     entityBody = "<HTML>"
                             + "<HEAD><TITLE>404 Not Found</TITLE></HEAD>"
                             + "<BODY>404 Not Found"
                             + "<br>usage:http://" + socket.getLocalAddress() + ":" + socket.getLocalPort()
-                            + fileName +"</BODY></HTML>";
+                            + headerLines[1] +"</BODY></HTML>";
                     contentLengthLine = "Content-Length: " + (new Integer(entityBody.getBytes().length)).toString() + CRLF;
                 }
-
-                // Send the status line.
-                output.write(statusLine.getBytes());
-                System.out.println(statusLine);
-
-                // Send the server line.
-                output.write(serverLine.getBytes());
-                System.out.println(serverLine);
-
-                // Send the content type line.
-                output.write(contentTypeLine.getBytes());
-                System.out.println(contentTypeLine);
-
-                // Send the Content-Length
-                output.write(contentLengthLine.getBytes());
-                System.out.println(contentLengthLine);
-
-                // Send a blank line to indicate the end of the header lines.
-                output.write(CRLF.getBytes());
-                System.out.println(CRLF);
 
                 // Send the entity body.
                 if (fileExists) {
@@ -107,6 +97,14 @@ public class HttpRequestHandler implements Runnable {
                     output.write(entityBody.getBytes());
                 }
 
+            }
+            
+            if (headerLines[0].equals("POST")) {
+            	if (headerLines[1].equals("/transactions")) {
+            		
+            	} else if (headerLines[1].equals("/blocks")) {
+            		
+				}
             }
 
         }
@@ -118,11 +116,38 @@ public class HttpRequestHandler implements Runnable {
         } catch (Exception e) {
         }
     }
+    
+    private  void sendOkResponse() {
+    	try {
+            FileInputStream fis = new FileInputStream("peers.txt");
+            contentLengthLine = "Content-Length: "
+                + (new Integer(fis.available())).toString() + CRLF;
+            // Send the status line.
+			output.write(statusOkLine.getBytes());
+			System.out.println(statusOkLine);
+			
+			// Send the content type line.
+			output.write(contentTypeJSONLine.getBytes());
+			System.out.println(contentTypeJSONLine);
+			
+			// Send the Content-Length
+			output.write(contentLengthLine.getBytes());
+			System.out.println(contentLengthLine);
+			
+			// Send a blank line to indicate the end of the header lines.
+			output.write(CRLF.getBytes());
+			System.out.println(CRLF);
+			
+			sendBytes(fis, output);
+			fis.close();
+        } catch (IOException e) {
+            //TODO
+        }
+    }
+    
 
-    //private
-
-    private static void sendBytes(FileInputStream fis, OutputStream os)
-            throws Exception {
+    private void sendBytes(FileInputStream fis, OutputStream os)
+            throws IOException {
 
         byte[] buffer = new byte[1024];
         int bytes = 0;

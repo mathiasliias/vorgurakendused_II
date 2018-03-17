@@ -1,7 +1,7 @@
 package data;
 
-public class Node {
-    public String id;
-    public String uri;
 
+public class Peer {
+    public String peerId;
+    public String peerIp;
 }

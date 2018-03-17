@@ -16,7 +16,7 @@ import org.codehaus.jettison.json.JSONObject;
 
 public class DataManager {
 
-	private static Path path = Paths.get("conf.txt");
+	private static Path peersPath = Paths.get("peers.txt");
 	
 	private static List<Peer> peers = new ArrayList<>();
 	
@@ -25,11 +25,11 @@ public class DataManager {
 		return peers;
 	}
 	
-	public static JSONObject readPeersFromFile() {
+	public static String readPeersFromFile() {
 		StringBuilder data = new StringBuilder();
 	    Stream<String> lines;
 		try {
-			lines = Files.lines(path);
+			lines = Files.lines(peersPath);
 			lines.forEach(line -> data.append(line).append("\n"));
 			lines.close();
 		} catch (IOException e) {
@@ -45,6 +45,6 @@ public class DataManager {
 			e.printStackTrace();
 			return null;
 		}
-		return jsonPeers;
+		return data.toString();
 	}
 }
