@@ -1,35 +1,41 @@
 package httpserver;
 
 import java.io.*;
-import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.Socket;
-import java.util.StringTokenizer;
+import java.net.SocketException;
+import java.util.List;
 import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import data.Block;
+import data.DataManager;
 
 
 public class HttpRequestHandler implements Runnable {
-    final static String CRLF = "\r\n";
+    public final static String CRLF = "\r\n";
 
     private Socket socket;
 
     private InputStream input;
 
-    private OutputStream output;
+    private static OutputStream output;
 
     private BufferedReader br;
     
-    private String statusOkLine = "HTTP/1.0 200 OK" + CRLF;;
+    private String statusOkLine = "HTTP/1.0 200 OK" + CRLF;
+    private String statusBadLine = "HTTP/1.0 400 Bad Request" + CRLF;
     private String contentTypeJSONLine = "Content-Type: application/json" + CRLF;
-    private String entityBody = null;
-    private String contentLengthLine;
+    private String contentLengthLine = "Content-Length: ";
+    private DataManager dataManager;
         
 
-    public HttpRequestHandler(Socket socket) throws Exception {
+    public HttpRequestHandler(Socket socket, DataManager dataManager) throws Exception {
         this.socket = socket;
         this.input = socket.getInputStream();
         this.output = socket.getOutputStream();
         this.br = new BufferedReader(new InputStreamReader(input));
+        this.dataManager = dataManager;
     }
 
     public void run() {
@@ -41,134 +47,129 @@ public class HttpRequestHandler implements Runnable {
     }
 
     private void processRequest() throws Exception {
-        while (true) {
-
-            String headerLine = br.readLine();
-            System.out.println(headerLine);
+        while (!socket.isClosed()) {
+        	String headerLine = br.readLine();
+            
             if (headerLine.equals(CRLF) || headerLine.equals(""))
                 break;
 
             // GET[/clones, /blocks, /blocks/x, /block/x,] POST[/block /transaction]
             String[] headerLines = headerLine.split("\\s");
             
-
             if (headerLines[0].equals("GET")) {
-            	
             	if (headerLines[1].equals("/clones")) {
-            		sendOkResponse();
+            		sendAllPeers();
             	} else if (headerLines[1].equals("/blocks")) {
-            		sendOkResponse();
+            		sendBlocks("0");
 				} else if (Pattern.matches("/blocks/.*", headerLines[1])) {
-					String blocksFrom = headerLines[1].split("/")[1];
-					sendOkResponse();
+					String blocksFrom = headerLines[1].split("/")[2];
+					sendBlocks(blocksFrom);
 				} else if (Pattern.matches("/block/.*", headerLines[1])) {
-					String blockId = headerLines[1].split("/")[1];
-					sendOkResponse();
+					String blockId = headerLines[1].split("/")[2];
+					sendBlock(Integer.valueOf(blockId));
 				}
-            	
-
-                String fileName = "/results.txt";
-
-                FileInputStream fis = null;
-                boolean fileExists = true;
-                try {
-                    fis = new FileInputStream("." + fileName);
-                } catch (FileNotFoundException e) {
-                    fileExists = false;
-                }
-
-                if (fileExists) {
-
-                } else {
-                    String statusBadLine = "HTTP/1.0 404 Not Found" + CRLF;
-                    entityBody = "<HTML>"
-                            + "<HEAD><TITLE>404 Not Found</TITLE></HEAD>"
-                            + "<BODY>404 Not Found"
-                            + "<br>usage:http://" + socket.getLocalAddress() + ":" + socket.getLocalPort()
-                            + headerLines[1] +"</BODY></HTML>";
-                    contentLengthLine = "Content-Length: " + (new Integer(entityBody.getBytes().length)).toString() + CRLF;
-                }
-
-                // Send the entity body.
-                if (fileExists) {
-                    sendBytes(fis, output);
-                    fis.close();
-                } else {
-                    output.write(entityBody.getBytes());
-                }
-
-            }
-            
-            if (headerLines[0].equals("POST")) {
+            } else if (headerLines[0].equals("POST")) {
             	if (headerLines[1].equals("/transactions")) {
-            		
+            		//Read body
+            		while (true) {
+            			//Get to body
+            			headerLine = br.readLine();
+            			if (headerLine.equals(CRLF) || headerLine.equals(""))
+            				break;
+            		}
+                	StringBuilder requestBody = new StringBuilder();
+                	br.lines().forEach(s->requestBody.append(s));
+                	dataManager.addTransaction(requestBody.toString());
+                	
             	} else if (headerLines[1].equals("/blocks")) {
-            		
-				}
+            		while (true) {
+            			headerLine = br.readLine();
+            			if (headerLine.equals(CRLF) || headerLine.equals(""))
+            				break;
+            		}
+                	StringBuilder requestBody = new StringBuilder();
+                	br.lines().forEach(s->requestBody.append(s));
+                	dataManager.addBlocks(requestBody.toString());
+            	}
             }
 
         }
-
-        try {
-            output.close();
-            br.close();
-            socket.close();
-        } catch (Exception e) {
+        if (!socket.getKeepAlive()) {
+        	try {
+        		output.close();
+        		br.close();
+        		socket.close();
+        	} catch (Exception e) {
+        		e.printStackTrace();
+        	}
         }
+        
     }
     
-    private  void sendOkResponse() {
+    private void sendBlock(Integer valueOf) {
     	try {
-            FileInputStream fis = new FileInputStream("peers.txt");
-            contentLengthLine = "Content-Length: "
-                + (new Integer(fis.available())).toString() + CRLF;
-            // Send the status line.
-			output.write(statusOkLine.getBytes());
-			System.out.println(statusOkLine);
-			
-			// Send the content type line.
-			output.write(contentTypeJSONLine.getBytes());
-			System.out.println(contentTypeJSONLine);
-			
-			// Send the Content-Length
-			output.write(contentLengthLine.getBytes());
-			System.out.println(contentLengthLine);
-			
-			// Send a blank line to indicate the end of the header lines.
-			output.write(CRLF.getBytes());
-			System.out.println(CRLF);
-			
-			sendBytes(fis, output);
-			fis.close();
-        } catch (IOException e) {
-            //TODO
-        }
+    		System.out.println("Searching for block " + valueOf);
+			writeBytesOk(dataManager.getBlock(valueOf));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private void sendBlocks(String fromBlockId) {
+    	try {
+    		List<Block> blocks = dataManager.getBlocks(fromBlockId);
+    		String json = null;
+    		if (blocks != null) {
+    			json = new ObjectMapper().writeValueAsString(dataManager.getBlocks(fromBlockId));
+    		}
+    		writeBytesOk(json);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	private  void sendAllPeers() {
+		try {
+			String json = dataManager.getClones();
+			writeBytesOk(json);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
     
+    private void writeBytesBad() throws IOException {
+    	//Bad request
+		output.write(statusBadLine.getBytes());
+		System.out.println(statusBadLine);
+	}
 
-    private void sendBytes(FileInputStream fis, OutputStream os)
-            throws IOException {
-
-        byte[] buffer = new byte[1024];
-        int bytes = 0;
-
-        while ((bytes = fis.read(buffer)) != -1) {
-            os.write(buffer, 0, bytes);
-        }
-    }
-
-    private static String contentType(String fileName) {
-        if (fileName.endsWith(".htm") || fileName.endsWith(".html")
-                || fileName.endsWith(".txt")) {
-            return "text/html";
-        } else if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
-            return "image/jpeg";
-        } else if (fileName.endsWith(".gif")) {
-            return "image/gif";
-        } else if (fileName.endsWith(".json")) {
-            return "application/json";
-        } else {
-            return "application/octet-stream";
-        }
+	private void writeBytesOk(String jsonBody) throws IOException {
+		if (!socket.isClosed()) {
+			if (jsonBody == null || jsonBody.length() <= 2) {
+	    		writeBytesBad();
+    	
+	    	} else {
+	    		// Send status OK line.
+				output.write(statusOkLine.getBytes());
+				System.out.println(statusOkLine);
+				//Content length
+				contentLengthLine += jsonBody.getBytes().length + CRLF;
+				output.write(contentLengthLine.getBytes());
+				//Content type
+				output.write(contentTypeJSONLine.getBytes());
+				System.out.println(contentLengthLine);
+				//Empty line
+				output.write(CRLF.getBytes());
+				//Body
+				output.write(jsonBody.getBytes());
+				System.out.println(jsonBody);
+	    	}
+			
+		} else {
+			System.out.println("Socket already closed");
+		}
     }
 }
